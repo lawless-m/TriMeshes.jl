@@ -1,0 +1,13 @@
+name = "TriMeshes"
+uuid = "017885df-44d7-498c-8344-6c32d2071748"
+authors = ["Matt Lawless"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

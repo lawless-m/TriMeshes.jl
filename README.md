@@ -1,2 +1,1 @@
-# TriMeshes.jl
-triangular meshes
+# TriMeshes
