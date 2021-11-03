@@ -1,7 +1,5 @@
 module TriMeshes
 
-using Printf
-
 export Vertex, angleXY, angleYX, angleYZ, angleZY, angleXZ, angleZX, rotate, translate, transformVerts, Edge, Face, Net, vertex!, face!, abc, abci, areaXY, magnitude
 
 struct Vertex
@@ -14,7 +12,7 @@ end
 
 import Base.show
 function show(io::IO,v::Vertex)
-       @printf(io,"Vertex(%0.4f, %0.4f, %0.4f)", v.x, v.y, v.z)
+       print(io,"Vertex($(round(v.x, digits=4)), $(round(v.y, digits=4)), $(round(v.z, digits=4)))")
 end
 
 import Base.+
