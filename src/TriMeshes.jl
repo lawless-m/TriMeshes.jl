@@ -1,8 +1,12 @@
-module Mesh
+module TriMeshes
 
-using Printf
+using StaticArrays
 using LinearAlgebra
-using Vertices
+using Polynomials
+
+const Vertex = SVector{3,Float64}
+
+include("Splines.jl")
 
 export scale, transformVerts, Edge, Face, Net, vertex!, face!, stl, wrap, flatRing!, quadRSlice, quadVSlice, outerSlice, innerSlice, apply, cylinder!, flatDisk!, tube!
 
@@ -58,7 +62,7 @@ function quadRSlice(az2r, a, astep, zmin, zmax) # (r1L, r2L, r1H, r2H)
 	return [az2r(a, zmin), az2r(a+astep, zmin), az2r(a, zmax), az2r(a+astep, zmax)]
 end
 
-function quadVSlice(net, a, astep, zmin, zmax, rs)
+function quadVSlice(net::Net, a::Float64, astep, zmin, zmax, rs)
 
 	v1L = vertex!(net, rs[1] * cos(a), rs[1] * sin(a), zmin)
 	v2L = vertex!(net, rs[2] * cos(a+astep), rs[2] * sin(a+astep), zmin)
@@ -68,7 +72,7 @@ function quadVSlice(net, a, astep, zmin, zmax, rs)
 	return [v1L, v2L, v1H, v2H]
 end
 
-function outerSlice(net, az2r, asteps, zmin, zmax)
+function outerSlice(net::Net, az2r::Function, asteps, zmin, zmax)
 	vs = zeros(Int, 4asteps)
 	astep = 2pi / asteps
 	vi = 1
@@ -81,7 +85,7 @@ function outerSlice(net, az2r, asteps, zmin, zmax)
 	vs
 end
 
-function quadVSlice(net, o, a, astep, zstep, rs)
+function quadVSlice(net::Net, o::Vertex, a::Float64, astep, zstep, rs)
 
 	v1L = vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z)
 	v2L = vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z)
@@ -92,7 +96,7 @@ function quadVSlice(net, o, a, astep, zstep, rs)
 end
 
 
-function outerSlice(net, o, az2r, asteps, zstep)
+function outerSlice(net::Net, o::Vertex, az2r::Function, asteps, zstep)
 	vs = zeros(Int, 4asteps)
 	astep = 2pi / asteps
 	vi = 1
@@ -196,26 +200,127 @@ function tube!(net, radius, sides, astart, srcnet, srcvertices, startz, endz)
 
 end
 
-function stl(n::Net)
-	stl(n, STDOUT)
-end
- 
-function stl(n::Net, fn::String)
-	fid = open(fn, "w+")
-	stl(n, fid)
-	close(fid)
+
+const Vertex = SVector{3,Float64}
+
+export Vertex, angleXY, angleYX, angleYZ, angleZY, angleXZ, angleZX, rotate, translate, transformVerts, Edge, Face, Net, vertex!, face!, abc, abci, areaXY, magnitude
+
+
+import Base.show
+function show(io::IO,v::Vertex)
+       print(io,"Vertex($(round(v.x, digits=4)), $(round(v.y, digits=4)), $(round(v.z, digits=4)))")
 end
 
-function stl(n::Net, io::IO)
-	println(io, "solid Mesh.jl")
-	for f in n.faces
-		abf = n.vertices[f.AB.from]
-		abt = n.vertices[f.AB.to]
-		bct = n.vertices[f.BC.to]
-		@printf(io, "facet normal 0 0 0\n\touter loop\n\t\tvertex %0.2f %0.2f %0.2f\n\t\tvertex %0.2f %0.2f %0.2f\n\t\tvertex %0.2f %0.2f %0.2f\nendloop\n", abf.x, abf.y, abf.z, abt.x, abt.y, abt.z, bct.x, bct.y, bct.z)
+
+#import Base.LinAlg.vecdot
+function vecdot(v1::Vertex, v2::Vertex)
+	vecdot([v1.x, v1.y, v1.z], [v2.x, v2.y, v2.z])
+end
+
+#import Base.LinAlg.cross
+function cross(v1::Vertex, v2::Vertex)
+	cross([v1.x, v1.y, v1.z], [v2.x, v2.y, v2.z])
+end
+
+#import Base.LinAlg.normalize
+function normalize(v::Vertex)
+      n = normalize([v.x, v.y, v.z])
+      Vertex(n[1], n[2], n[3])
+end
+
+function angle(x,y) 
+	# atan(y,x) - take point (x,y) - angle from x axis to point
+	if x == y == 0
+		0.0
+	else
+		atan(y,x)
 	end
-	println(io, "endsolid Mesh.jl")
 end
-### STAHP
 
+function angleXY(v::Vertex)
+	# project onto plane XY, angle from X axis to point		
+	angle(v.x, v.y)
+end
+
+function angleYX(v::Vertex)
+	# project onto plane XY, angle from Y axis to point		
+	angle(v.y, v.x)
+end
+
+function angleYZ(v::Vertex)
+	# project onto plane YZ, angle from Y axis to point
+	angle(v.y, v.z)
+end
+
+function angleZY(v::Vertex)
+	# project onto plane YZ, angle from Z axis to point
+	angle(v.z, v.y)
+end
+
+function angleXZ(v::Vertex)
+	# project onto plane XZ, angle from X axis to point
+	angle(v.x, v.z)
+end
+
+function angleZX(v::Vertex)
+	# project onto plane XZ, angle from Z axis to point
+	angle(v.z, v.x)
+end
+
+function rotate(v::Vertex, a::Vertex)
+	if abs(a.x) > 0
+		v = Vertex(v.x, v.y * cos(a.x) - v.z * sin(a.x), v.y * sin(a.x) + v.z * cos(a.x))
+	end
+	if abs(a.y) > 0
+		v = Vertex(v.z * sin(a.y) + v.x * cos(a.y), v.y, v.z * cos(a.y) - v.x * sin(a.y))
+	end
+	if abs(a.z) > 0
+		v = Vertex(v.x * cos(a.z) - v.y * sin(a.z), v.x * sin(a.z) + v.y * cos(a.z), v.z)
+	end
+	v
+end
+
+rotate(x, y, z, xa, ya, za) = rotate(Vertex(x,y,z), Vertex(xa, ya, za))
+rotate(v::Vertex, xa, ya, za) = rotate(v, Vertex(xa, ya, za))
+rotate(x, y, z, v::Vertex) = rotate(Vertex(x,y,z), v)
+
+translate(v::Vertex, t::Vertex) = v+t
+
+vertex!(n::Net, x, y) = vertex!(n, Vertex(x, y, 0.0))
+
+function vertex!(n::Net, v::Vertex)
+	push!(n.vertices, v)
+	length(n.vertices)
+end
+
+face!(n::Net, a, b, c) = face!(n, Face(Edge(a, b), Edge(b, c), Edge(c, a)))
+
+face!(n::Net, a, b, c, ab, bc, ca) = face!(n, Face(Edge(a, b, ab), Edge(b, c, bc), Edge(c, a, ca)))
+
+function face!(n::Net, f::Face)
+	push!(n.faces, f)
+	length(n.faces)
+end
+
+abci(n::Net, f::Face) = [f.ab.from, f.ab.to, f.ca.from]
+abci(n::Net, i::Integer) = abci(n, n.faces[i])
+
+abc(n::Net, f::Face) = n.vertices[abci(n, f)]
+abc(n::Net, i::Integer) = abc(n, n.faces[i])
+
+transformVerts(n::Net, f, vs::Integer, ve::Integer) = n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
+
+magnitude(v::Vertex) = sqrt(v.x^2 + v.y^2 + v.z^2)
+
+function areaXY(n::Net, f::Face) 
+	a,b,c = abc(n, f)
+
+	ab = b-a
+	ca = a-c
+
+	h = abs(magnitude(ab) * sin(angleXY(ab) - angleXY(ca)))
+	area = 0.5 * h * magnitude(ca)
+end
+
+###
 end

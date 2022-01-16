@@ -1,8 +1,3 @@
-module Splines
-
-using Mesh
-using Polynomials
-using Printf
 
 export Spline, Bearing, bearing!, controlForX, yVal
 
@@ -88,5 +83,3 @@ function bearing!(s::Spline, b::Bearing)
 	push!(s.controls, Control(o, b))
 end
 
-### STAHP
-end

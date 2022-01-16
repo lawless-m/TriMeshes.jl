@@ -1,6 +1,3 @@
-module TriMeshes
-
-using StaticArrays
 
 const Vertex = SVector{3,Float64}
 
@@ -149,6 +146,3 @@ function areaXY(n::Net, f::Face)
 end
 
 
-### STAHP
-
-end
