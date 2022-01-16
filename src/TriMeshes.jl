@@ -24,25 +24,9 @@ struct Net
 	Net() = new(Vector{Vertex}(), Vector{Face}(), Vector{Edge}())
 end
 
-function vertex!(n::Net, x::Float64, y::Float64, z::Float64)
-	vertex!(n, Vertex(x, y, z))
-end
-
-function vertex!(v::Vector{Vertex}, x::Float64, y::Float64, z::Float64)
-	vertex!(v, Vertex(x, y, z))
-end
-
-function vertex!(n::Net, x::Real, y::Real, z::Real)
-	vertex!(n, Vertex(Float64(x), Float64(y), Float64(z)))
-end
-
-function vertex!(v::Vector{Vertex}, x::Real, y::Real, z::Real)
-	vertex!(v, Vertex(Float64(x), Float64(y), Float64(z)))
-end
-
-function vertex!(n::Net, v::Vertex)
-	vertex!(n.vertices, v)
-end
+vertex!(n::Net, x, y, z) = vertex!(n, Vertex(x, y, z))
+vertex!(v::Vector{Vertex}, x, y, z) = vertex!(v, Vertex(x, y, z))
+vertex!(n::Net, v::Vertex) = vertex!(n.vertices, v)
 
 function vertex!(vs::Vector{Vertex}, v::Vertex)
 	push!(vs, v)
@@ -53,19 +37,11 @@ function scale(n::Net, x, y, z)
 	map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
 end
 
-function face!(n::Net, v1::Integer, v2::Integer, v3::Integer)
-	push!(n.faces, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
-end
+face!(n::Net, v1, v2, v3) = push!(n.faces, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
 
-function face!(f::Vector{Face}, v1::Integer, v2::Integer, v3::Integer)
-	push!(f, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
-end
+face!(f::Vector{Face}, v1, v2, v3) = push!(f, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
 
-function apply(net, vs, fn)
-	for v in vs
-		net.vertices[v] = fn(net.vertices[v])
-	end
-end
+apply(net, vs, fn) = foreach(v->net.vertices[v] = fn(net.vertices[v]), vs)
 
 function wrap(n::Net, az2r)
 
@@ -82,7 +58,7 @@ function quadRSlice(az2r, a, astep, zmin, zmax) # (r1L, r2L, r1H, r2H)
 	return [az2r(a, zmin), az2r(a+astep, zmin), az2r(a, zmax), az2r(a+astep, zmax)]
 end
 
-function quadVSlice(net::Net, a::Float64, astep::Float64, zmin::Real, zmax::Real, rs::Vector)
+function quadVSlice(net, a, astep, zmin, zmax, rs)
 
 	v1L = vertex!(net, rs[1] * cos(a), rs[1] * sin(a), zmin)
 	v2L = vertex!(net, rs[2] * cos(a+astep), rs[2] * sin(a+astep), zmin)
@@ -92,7 +68,7 @@ function quadVSlice(net::Net, a::Float64, astep::Float64, zmin::Real, zmax::Real
 	return [v1L, v2L, v1H, v2H]
 end
 
-function outerSlice(net::Net, az2r::Function, asteps::Int64, zmin::Real, zmax::Real)
+function outerSlice(net, az2r, asteps, zmin, zmax)
 	vs = zeros(Int, 4asteps)
 	astep = 2pi / asteps
 	vi = 1
@@ -105,7 +81,7 @@ function outerSlice(net::Net, az2r::Function, asteps::Int64, zmin::Real, zmax::R
 	vs
 end
 
-function quadVSlice(net::Net, o::Vertex, a::Float64, astep::Float64, zstep::Real, rs::Vector)
+function quadVSlice(net, o, a, astep, zstep, rs)
 
 	v1L = vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z)
 	v2L = vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z)
@@ -116,7 +92,7 @@ function quadVSlice(net::Net, o::Vertex, a::Float64, astep::Float64, zstep::Real
 end
 
 
-function outerSlice(net::Net, o::Vertex, az2r::Function, asteps::Int64, zstep::Real)
+function outerSlice(net, o, az2r, asteps, zstep)
 	vs = zeros(Int, 4asteps)
 	astep = 2pi / asteps
 	vi = 1
@@ -129,7 +105,7 @@ function outerSlice(net::Net, o::Vertex, az2r::Function, asteps::Int64, zstep::R
 	vs
 end
 
-function quadVSlice(net::Net, o::Vertex, t::Vertex, a::Float64, astep::Float64, rs::Vector)
+function quadVSlice(net, o, t, a, astep, rs)
 
 	v1L = vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z)
 	v2L = vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z)
@@ -139,7 +115,7 @@ function quadVSlice(net::Net, o::Vertex, t::Vertex, a::Float64, astep::Float64, 
 	return [v1L, v2L, v1H, v2H]
 end
 
-function outerSlice(net::Net, o::Vertex, t::Vertex, az2r::Function, astart::Float64, asteps::Int64)
+function outerSlice(net, o, t, az2r, astart, asteps)
 	vs = zeros(Int, 4asteps)
 	astep = 2pi / asteps
 	vi = 1
