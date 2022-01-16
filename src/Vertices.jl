@@ -1,42 +1,17 @@
 module TriMeshes
 
+using StaticArrays
+
+const Vertex = SVector{3,Float64}
+
 export Vertex, angleXY, angleYX, angleYZ, angleZY, angleXZ, angleZX, rotate, translate, transformVerts, Edge, Face, Net, vertex!, face!, abc, abci, areaXY, magnitude
 
-struct Vertex
-	x
-	y
-	z
-	Vertex(x,y,z) = new(x,y,z)
-	Vertex(x,y) = new(x,y,zero(typeof(x)))
-end
 
 import Base.show
 function show(io::IO,v::Vertex)
        print(io,"Vertex($(round(v.x, digits=4)), $(round(v.y, digits=4)), $(round(v.z, digits=4)))")
 end
 
-import Base.+
-function +(a::Vertex, b::Vertex)
-	Vertex(a.x+b.x, a.y+b.y, a.z+b.z)
-end
-
-import Base.-
-function -(a::Vertex, b::Vertex)
-	Vertex(a.x-b.x, a.y-b.y, a.z-b.z)
-end
-
-import Base./
-function /(a::Vertex, s::Real)
-	Vertex(a.x/s, a.y/s, a.z/s)
-end
- 
-import Base.*
-function *(a::Vertex, s::Real)
-	Vertex(a.x*s, a.y*s, a.z*s)
-end
-function *(s::Real, a::Vertex)
-	Vertex(a.x*s, a.y*s, a.z*s)
-end
 
 #import Base.LinAlg.vecdot
 function vecdot(v1::Vertex, v2::Vertex)
@@ -106,22 +81,11 @@ function rotate(v::Vertex, a::Vertex)
 	v
 end
 
-function rotate(x::Real, y::Real, z::Real, xa::Real, ya::Real, za::Real)
-	rotate(Vertex(x,y,z), Vertex(xa, ya, za))
-end
+rotate(x, y, z, xa, ya, za) = rotate(Vertex(x,y,z), Vertex(xa, ya, za))
+rotate(v::Vertex, xa, ya, za) = rotate(v, Vertex(xa, ya, za))
+rotate(x, y, z, v::Vertex) = rotate(Vertex(x,y,z), v)
 
-function rotate(v::Vertex, xa::Real, ya::Real, za::Real)
-	rotate(v, Vertex(xa, ya, za))
-end
-
-function rotate(x::Real, y::Real, z::Real, v::Vertex)
-	rotate(Vertex(x,y,z), v)
-end
-
-function translate(v::Vertex, t::Vertex)
-	v+t
-end
-
+translate(v::Vertex, t::Vertex) = v+t
 
 struct Edge
 	from::Integer
@@ -147,24 +111,17 @@ struct Net
 	Net() = new(Vector{Vertex}(), Vector{Face}(), Vector{Edge}())
 end
 
-vertex!(n::Net, x::Float64, y::Float64, z::Float64) = vertex!(n, Vertex(x, y, z))
-vertex!(n::Net, x::Float64, y::Float64) = vertex!(n, Vertex(x, y, 0.0))
-
-vertex!(n::Net, x::Real, y::Real, z::Real) = vertex!(n, Vertex(Float64(x), Float64(y), Float64(z)))
-vertex!(n::Net, x::Real, y::Real) = vertex!(n, Vertex(Float64(x), Float64(y), 0.0))
+vertex!(n::Net, x, y, z) = vertex!(n, Vertex(x, y, z))
+vertex!(n::Net, x, y) = vertex!(n, Vertex(x, y, 0.0))
 
 function vertex!(n::Net, v::Vertex)
 	push!(n.vertices, v)
 	length(n.vertices)
 end
 
-function face!(n::Net, a::Integer, b::Integer, c::Integer)
-	face!(n, Face(Edge(a, b), Edge(b, c), Edge(c, a)))
-end
+face!(n::Net, a, b, c) = face!(n, Face(Edge(a, b), Edge(b, c), Edge(c, a)))
 
-function face!(n::Net, a::Integer, b::Integer, c::Integer, ab, bc, ca)
-	face!(n, Face(Edge(a, b, ab), Edge(b, c, bc), Edge(c, a, ca)))
-end
+face!(n::Net, a, b, c, ab, bc, ca) = face!(n, Face(Edge(a, b, ab), Edge(b, c, bc), Edge(c, a, ca)))
 
 function face!(n::Net, f::Face)
 	push!(n.faces, f)
@@ -177,9 +134,7 @@ abci(n::Net, i::Integer) = abci(n, n.faces[i])
 abc(n::Net, f::Face) = n.vertices[abci(n, f)]
 abc(n::Net, i::Integer) = abc(n, n.faces[i])
 
-function transformVerts(n::Net, f, vs::Integer, ve::Integer)
-	n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
-end
+transformVerts(n::Net, f, vs::Integer, ve::Integer) = n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
 
 magnitude(v::Vertex) = sqrt(v.x^2 + v.y^2 + v.z^2)
 
@@ -187,7 +142,6 @@ function areaXY(n::Net, f::Face)
 	a,b,c = abc(n, f)
 
 	ab = b-a
-println(ab)
 	ca = a-c
 
 	h = abs(magnitude(ab) * sin(angleXY(ab) - angleXY(ca)))
