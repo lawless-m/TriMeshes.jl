@@ -1,9 +1,9 @@
 
 using TriMeshes
-using SVG
+#using SVG
 using LinearAlgebra
 
-debug = true
+debug = false
 
 n = Net()
 
@@ -141,6 +141,7 @@ function stockp(t::Float64, tstep::Float64)
 	Vertex(x,y,z)
 end
 
+#==
 function pathsvg(fname, tstep, fpath)
 	pts = Vector{Tuple{Real,Real}}()
 	st = fpath(1., tstep)
@@ -154,7 +155,7 @@ function pathsvg(fname, tstep, fpath)
 	write(fname, Svg([Polyline(pts; style=Style(;strokewidth=3))]), 500, 500; inhtml=true)
 
 end
-
+==#
 
 function sweep(n::Net, steps, multiples=1)
 	e = o = Vertex(0,0,0)
@@ -181,7 +182,7 @@ function knit(n, stitches::Integer, rowpairs::Integer)
 		ty += 15
 	end
 
-	STL_ASCII(n, "stk.stl")
+	#STL_ASCII(n, "stk.stl")
 end
 
 function go()

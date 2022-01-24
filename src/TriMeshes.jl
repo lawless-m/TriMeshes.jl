@@ -217,7 +217,7 @@ function show(io::IO,v::Vertex)
        print(io,"Vertex($(round(v.x, digits=4)), $(round(v.y, digits=4)), $(round(v.z, digits=4)))")
 end
 
-function LinearAlgebra.vecdot(v1::Vertex, v2::Vertex)
+function LinearAlgebra.dot(v1::Vertex, v2::Vertex)
 	vecdot([v1.x, v1.y, v1.z], [v2.x, v2.y, v2.z])
 end
 
@@ -294,8 +294,6 @@ abci(n::Net, i::Integer) = abci(n.faces[i])
 
 abc(n::Net, f::Face) = n.vertices[abci(f)]
 abc(n::Net, i::Integer) = abc(n, n.faces[i])
-
-transformVerts!(n::Net, f, vs::Integer, ve::Integer) = n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
 
 magnitude(v::Vertex) = sqrt(v.x^2 + v.y^2 + v.z^2)
 
