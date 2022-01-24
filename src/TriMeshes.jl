@@ -5,10 +5,14 @@ using LinearAlgebra
 using Polynomials
 
 const Vertex = SVector{3,Float64}
+const QuadF = SVector{4,Int64}
+const QuadI = SVector{4,Int64}
+const TriI = SVector{3,Int64}
 
 include("Splines.jl")
 
-export scale, transformVerts, Edge, Face, Net, vertex!, face!, stl, wrap, flatRing!, quadRSlice, quadVSlice, outerSlice, innerSlice, apply, cylinder!, flatDisk!, tube!
+export scale, transformVerts, Edge, Face, Net, vertex!, face!, stl, wrap, flatRing!, quadRSlice, quadVSlice, outerSlice, innerSlice, apply!, cylinder!, flatDisk!, tube!
+export areaXY, magnitude
 
 struct Edge
 	from::Integer
@@ -29,6 +33,7 @@ struct Net
 end
 
 vertex!(n::Net, x, y, z) = vertex!(n, Vertex(x, y, z))
+vertex!(n::Net, x, y) = vertex!(n, Vertex(x, y, 0.0))
 vertex!(v::Vector{Vertex}, x, y, z) = vertex!(v, Vertex(x, y, z))
 vertex!(n::Net, v::Vertex) = vertex!(n.vertices, v)
 
@@ -37,15 +42,17 @@ function vertex!(vs::Vector{Vertex}, v::Vertex)
 	length(vs)
 end
 
-function scale(n::Net, x, y, z) 
-	map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
+
+scale(n::Net, x, y, z)  = map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
+scale(n::Net, s::Vertex)  = map!(v->Vertex(v.x*s.x, v.y*s.y, v.z*s.z), n.vertices, n.vertices)
+
+face!(n::Net, a::Int, b::Int, c::Int) = face!(n, Face(Edge(a, b), Edge(b, c), Edge(c, a)))
+function face!(n::Net, f::Face)
+	push!(n.faces, f)
+	length(n.faces)
 end
 
-face!(n::Net, v1, v2, v3) = push!(n.faces, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
-
-face!(f::Vector{Face}, v1, v2, v3) = push!(f, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
-
-apply(net, vs, fn) = foreach(v->net.vertices[v] = fn(net.vertices[v]), vs)
+apply!(net, vs, fn) = foreach(v->net.vertices[v] = fn(net.vertices[v]), vs)
 
 function wrap(n::Net, az2r)
 
@@ -58,19 +65,19 @@ function wrap(n::Net, az2r)
 	map!(trans, n.vertices, n.vertices)
 end
 
-function quadRSlice(az2r, a, astep, zmin, zmax) # (r1L, r2L, r1H, r2H)
-	return [az2r(a, zmin), az2r(a+astep, zmin), az2r(a, zmax), az2r(a+astep, zmax)]
-end
+quadRSlice(az2r, a, astep, zmin, zmax) = QuadF[
+		az2r(a, zmin), 
+		az2r(a+astep, zmin), 
+		az2r(a, zmax), 
+		az2r(a+astep, zmax)
+	]
 
-function quadVSlice(net::Net, a::Float64, astep, zmin, zmax, rs)
-
-	v1L = vertex!(net, rs[1] * cos(a), rs[1] * sin(a), zmin)
-	v2L = vertex!(net, rs[2] * cos(a+astep), rs[2] * sin(a+astep), zmin)
-	v1H = vertex!(net, rs[3] * cos(a), rs[3] * sin(a), zmax)
-	v2H = vertex!(net, rs[4] * cos(a+astep), rs[4] * sin(a+astep), zmax)
-
-	return [v1L, v2L, v1H, v2H]
-end
+quadVSlice(net::Net, a::Float64, astep, zmin, zmax, rs) = QuadI[
+		vertex!(net, rs[1] * cos(a), rs[1] * sin(a), zmin),
+		vertex!(net, rs[2] * cos(a+astep), rs[2] * sin(a+astep), zmin),
+		vertex!(net, rs[3] * cos(a), rs[3] * sin(a), zmax),
+		vertex!(net, rs[4] * cos(a+astep), rs[4] * sin(a+astep), zmax)
+	]
 
 function outerSlice(net::Net, az2r::Function, asteps, zmin, zmax)
 	vs = zeros(Int, 4asteps)
@@ -85,15 +92,12 @@ function outerSlice(net::Net, az2r::Function, asteps, zmin, zmax)
 	vs
 end
 
-function quadVSlice(net::Net, o::Vertex, a::Float64, astep, zstep, rs)
-
-	v1L = vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z)
-	v2L = vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z)
-	v1H = vertex!(net, o.x+rs[3] * cos(a), o.y+rs[3] * sin(a), o.z+zstep)
-	v2H = vertex!(net, o.x+rs[4] * cos(a+astep), o.y+rs[4] * sin(a+astep), o.z+zstep)
-
-	return [v1L, v2L, v1H, v2H]
-end
+quadVSlice(net::Net, o::Vertex, a::Float64, astep, zstep, rs) = QuadI[
+		vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z),
+		vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z),
+		vertex!(net, o.x+rs[3] * cos(a), o.y+rs[3] * sin(a), o.z+zstep),
+		vertex!(net, o.x+rs[4] * cos(a+astep), o.y+rs[4] * sin(a+astep), o.z+zstep)
+	]
 
 
 function outerSlice(net::Net, o::Vertex, az2r::Function, asteps, zstep)
@@ -109,15 +113,12 @@ function outerSlice(net::Net, o::Vertex, az2r::Function, asteps, zstep)
 	vs
 end
 
-function quadVSlice(net, o, t, a, astep, rs)
-
-	v1L = vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z)
-	v2L = vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z)
-	v1H = vertex!(net, t.x+rs[3] * cos(a), t.y+rs[3] * sin(a), t.z)
-	v2H = vertex!(net, t.x+rs[4] * cos(a+astep), t.y+rs[4] * sin(a+astep), t.z)
-
-	return [v1L, v2L, v1H, v2H]
-end
+quadVSlice(net, o, t, a, astep, rs) = QuadI[
+		vertex!(net, o.x+rs[1] * cos(a), o.y+rs[1] * sin(a), o.z),
+		vertex!(net, o.x+rs[2] * cos(a+astep), o.y+rs[2] * sin(a+astep), o.z),
+		vertex!(net, t.x+rs[3] * cos(a), t.y+rs[3] * sin(a), t.z),
+		vertex!(net, t.x+rs[4] * cos(a+astep), t.y+rs[4] * sin(a+astep), t.z)
+	]
 
 function outerSlice(net, o, t, az2r, astart, asteps)
 	vs = zeros(Int, 4asteps)
@@ -133,34 +134,34 @@ function outerSlice(net, o, t, az2r, astart, asteps)
 end
 
 function innerSlice(net, az2r, astep, zmin, zmax) 
-	vs = zeros(Int, 4asteps)
+	vns = zeros(Int, 4asteps)
 	astep = 2pi / asteps
 	vi = 1
 	for a in astep:astep:2pi
-		vs[vi:vi+3] = quadVSlice(net, a, astep, zmin, zmax, quadRSlice(az2r, a, astep, zmin, zmax))
-		face!(net, vs[vi+2], vs[vi+1], vs[vi])
-		face!(net, vs[vi+1], vs[vi+2], vs[vi+3])
+		vns[vi:vi+3] = quadVSlice(net, a, astep, zmin, zmax, quadRSlice(az2r, a, astep, zmin, zmax))
+		face!(net, vns[vi+2], vns[vi+1], vns[vi])
+		face!(net, vns[vi+1], vns[vi+2], vns[vi+3])
 		vi += 4
 	end
 	vs
 end
 
 function cylinder!(net::Net, centreL, centreH, asteps, az2r)
-	flat(net, centreL, az2r, v.asteps, "down")
+	flat(net, centreL, az2r, v.asteps, :down)
 	outerSlice(net, az2r, v.asteps, centreL.z, centreH.z)
-	flat(net, centreH, az2r, v.asteps, "up")
+	flat(net, centreH, az2r, v.asteps, :up)
 end
 
 function flatDisk!(net::Net, centre, az2r, astart, asteps, upordown)
 	astep = 2pi/asteps
 	for a in astep+astart:astep:2pi+astart
-		v1 = vertex!(net, centre.x + az2r(a, centre.z) * cos(a), centre.y + az2r(a, centre.z) * sin(a), centre.z)
-		v2 = vertex!(net, centre.x, centre.y, centre.z)
-		v3 = vertex!(net, centre.x + az2r(a+astep, centre.z) * cos(a+astep), centre.y + az2r(a+astep, centre.z) * sin(a+astep), centre.z)
-		if upordown == "up"
-			face!(net, v3, v2, v1)
+		vn1 = vertex!(net, centre.x + az2r(a, centre.z) * cos(a), centre.y + az2r(a, centre.z) * sin(a), centre.z)
+		vn2 = vertex!(net, centre.x, centre.y, centre.z)
+		vn3 = vertex!(net, centre.x + az2r(a+astep, centre.z) * cos(a+astep), centre.y + az2r(a+astep, centre.z) * sin(a+astep), centre.z)
+		if upordown == 
+			face!(net, vn3, vn2, vn1)
 		else
-			face!(net, v1, v2, v3)
+			face!(net, vn1, vn2, vn3)
 		end
 	end
 end
@@ -170,18 +171,18 @@ function flatRing!(n::Net, originL, astart, asteps, router, rinner, thickness)
 	astep = 2pi / asteps
 	for a in astep+astart:astep:2pi+astart
 
-		vo = map(p->vertex!(n, p[1] + Vertex(router*cos(p[2]), router*sin(p[2]), 0)), [(originL, a), (originL, a+astep), (originH, a), (originH, a+astep)])
-		vi = map(p->vertex!(n, p[1] + Vertex(rinner*cos(p[2]), rinner*sin(p[2]), 0)), [(originL, a), (originL, a+astep), (originH, a), (originH, a+astep)])
+		vno = map(p->vertex!(n, p[1] + Vertex(router*cos(p[2]), router*sin(p[2]), 0)), [(originL, a), (originL, a+astep), (originH, a), (originH, a+astep)])
+		vni = map(p->vertex!(n, p[1] + Vertex(rinner*cos(p[2]), rinner*sin(p[2]), 0)), [(originL, a), (originL, a+astep), (originH, a), (originH, a+astep)])
 
-		face!(n, vo[1], vo[2], vo[3])
-		face!(n, vo[4], vo[3], vo[2])
-		face!(n, vi[3], vi[2], vi[1])
-		face!(n, vi[2], vi[3], vi[4])
+		face!(n, vno[1], vno[2], vno[3])
+		face!(n, vno[4], vno[3], vno[2])
+		face!(n, vni[3], vni[2], vni[1])
+		face!(n, vni[2], vni[3], vni[4])
 
-		face!(n, vo[1], vi[1], vi[2])
-		face!(n, vi[2], vo[2], vo[1])
-		face!(n, vo[4], vi[3], vo[3])
-		face!(n, vo[4], vi[4], vi[3])
+		face!(n, vno[1], vni[1], vni[2])
+		face!(n, vni[2], vno[2], vno[1])
+		face!(n, vno[4], vni[3], vno[3])
+		face!(n, vno[4], vni[4], vni[3])
 
 	end
 
@@ -189,19 +190,16 @@ end
 
 function tube!(net, radius, sides, astart, srcnet, srcvertices, startz, endz)
 	for vtxn in srcvertices
-		if srcnet.vertices[vtxn[1]].z==startz
-			flatDisk!(net, srcnet.vertices[vtxn[1]], (a,z)->radius, astart, sides, "down")
+		if srcnet.vertices[vtxn[1]].z == startz
+			flatDisk!(net, srcnet.vertices[vtxn[1]], (a,z)->radius, astart, sides, :down)
 		end
 		outerSlice(net, srcnet.vertices[vtxn[1]], srcnet.vertices[vtxn[2]], (a,z)->radius, astart, sides)
-		if srcnet.vertices[vtxn[2]].z==endz
-			flatDisk!(net, srcnet.vertices[vtxn[2]], (a,z)->radius, astart, sides, "up")
+		if srcnet.vertices[vtxn[2]].z == endz
+			flatDisk!(net, srcnet.vertices[vtxn[2]], (a,z)->radius, astart, sides, :up)
 		end
 	end
 
 end
-
-
-const Vertex = SVector{3,Float64}
 
 export Vertex, angleXY, angleYX, angleYZ, angleZY, angleXZ, angleZX, rotate, translate, transformVerts, Edge, Face, Net, vertex!, face!, abc, abci, areaXY, magnitude
 
@@ -210,7 +208,6 @@ import Base.show
 function show(io::IO,v::Vertex)
        print(io,"Vertex($(round(v.x, digits=4)), $(round(v.y, digits=4)), $(round(v.z, digits=4)))")
 end
-
 
 #import Base.LinAlg.vecdot
 function vecdot(v1::Vertex, v2::Vertex)
@@ -286,41 +283,28 @@ rotate(x, y, z, v::Vertex) = rotate(Vertex(x,y,z), v)
 
 translate(v::Vertex, t::Vertex) = v+t
 
-vertex!(n::Net, x, y) = vertex!(n, Vertex(x, y, 0.0))
 
-function vertex!(n::Net, v::Vertex)
-	push!(n.vertices, v)
-	length(n.vertices)
-end
+abci(f::Face) = [f.ab.from, f.ab.to, f.ca.from]
+abci(n::Net, i::Integer) = abci(n.faces[i])
 
-face!(n::Net, a, b, c) = face!(n, Face(Edge(a, b), Edge(b, c), Edge(c, a)))
-
-face!(n::Net, a, b, c, ab, bc, ca) = face!(n, Face(Edge(a, b, ab), Edge(b, c, bc), Edge(c, a, ca)))
-
-function face!(n::Net, f::Face)
-	push!(n.faces, f)
-	length(n.faces)
-end
-
-abci(n::Net, f::Face) = [f.ab.from, f.ab.to, f.ca.from]
-abci(n::Net, i::Integer) = abci(n, n.faces[i])
-
-abc(n::Net, f::Face) = n.vertices[abci(n, f)]
+abc(n::Net, f::Face) = n.vertices[abci(f)]
 abc(n::Net, i::Integer) = abc(n, n.faces[i])
 
 transformVerts(n::Net, f, vs::Integer, ve::Integer) = n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
 
 magnitude(v::Vertex) = sqrt(v.x^2 + v.y^2 + v.z^2)
 
-function areaXY(n::Net, f::Face) 
-	a,b,c = abc(n, f)
+function areaXY(a::Vertex, b::Vertex, c::Vertex)
 
 	ab = b-a
 	ca = a-c
 
 	h = abs(magnitude(ab) * sin(angleXY(ab) - angleXY(ca)))
-	area = 0.5 * h * magnitude(ca)
+	0.5 * h * magnitude(ca)
 end
+
+areaXY(n::Net, f::Face) = areaXY(abc(n, f)...)
+
 
 ###
 end
