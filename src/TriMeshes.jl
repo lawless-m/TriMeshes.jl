@@ -5,14 +5,19 @@ using LinearAlgebra
 using Polynomials
 
 const Vertex = SVector{3,Float64}
+const Point2D = SVector{2,Float64}
 const QuadF = SVector{4,Int64}
 const QuadI = SVector{4,Int64}
 const TriI = SVector{3,Int64}
 
 include("Splines.jl")
+include("Spline_exports.jl")
 
-export scale, transformVerts, Edge, Face, Net, vertex!, face!, stl, wrap, flatRing!, quadRSlice, quadVSlice, outerSlice, innerSlice, apply!, cylinder!, flatDisk!, tube!
-export areaXY, magnitude
+export scale, Edge, Face, Net, vertex!, face!, stl, wrap
+export quadRSlice, quadVSlice, outerSlice, innerSlice
+export cylinder!, flatDisk!, tube!, flatRing!
+export transformVerts!, apply!
+export areaXY, magnitude, normalize
 
 struct Edge
 	from::Integer
@@ -42,7 +47,6 @@ function vertex!(vs::Vector{Vertex}, v::Vertex)
 	length(vs)
 end
 
-
 scale(n::Net, x, y, z)  = map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
 scale(n::Net, s::Vertex)  = map!(v->Vertex(v.x*s.x, v.y*s.y, v.z*s.z), n.vertices, n.vertices)
 
@@ -53,6 +57,10 @@ function face!(n::Net, f::Face)
 end
 
 apply!(net, vs, fn) = foreach(v->net.vertices[v] = fn(net.vertices[v]), vs)
+
+function transformVerts!(n::Net, f, vs::Integer, ve::Integer) 
+	n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
+end
 
 function wrap(n::Net, az2r)
 
@@ -201,7 +209,7 @@ function tube!(net, radius, sides, astart, srcnet, srcvertices, startz, endz)
 
 end
 
-export Vertex, angleXY, angleYX, angleYZ, angleZY, angleXZ, angleZX, rotate, translate, transformVerts, Edge, Face, Net, vertex!, face!, abc, abci, areaXY, magnitude
+export Vertex, angleXY, angleYX, angleYZ, angleZY, angleXZ, angleZX, rotate, translate, transformVerts!, Edge, Face, Net, vertex!, face!, abc, abci, areaXY, magnitude
 
 
 import Base.show
@@ -209,18 +217,15 @@ function show(io::IO,v::Vertex)
        print(io,"Vertex($(round(v.x, digits=4)), $(round(v.y, digits=4)), $(round(v.z, digits=4)))")
 end
 
-#import Base.LinAlg.vecdot
-function vecdot(v1::Vertex, v2::Vertex)
+function LinearAlgebra.vecdot(v1::Vertex, v2::Vertex)
 	vecdot([v1.x, v1.y, v1.z], [v2.x, v2.y, v2.z])
 end
 
-#import Base.LinAlg.cross
-function cross(v1::Vertex, v2::Vertex)
+function LinearAlgebra.cross(v1::Vertex, v2::Vertex)
 	cross([v1.x, v1.y, v1.z], [v2.x, v2.y, v2.z])
 end
 
-#import Base.LinAlg.normalize
-function normalize(v::Vertex)
+function LinearAlgebra.normalize(v::Vertex)
       n = normalize([v.x, v.y, v.z])
       Vertex(n[1], n[2], n[3])
 end
@@ -290,7 +295,7 @@ abci(n::Net, i::Integer) = abci(n.faces[i])
 abc(n::Net, f::Face) = n.vertices[abci(f)]
 abc(n::Net, i::Integer) = abc(n, n.faces[i])
 
-transformVerts(n::Net, f, vs::Integer, ve::Integer) = n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
+transformVerts!(n::Net, f, vs::Integer, ve::Integer) = n.vertices[vs:ve] = map(f, n.vertices[vs:ve])
 
 magnitude(v::Vertex) = sqrt(v.x^2 + v.y^2 + v.z^2)
 
