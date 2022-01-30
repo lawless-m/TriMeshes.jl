@@ -1,23 +1,23 @@
 
-export Spline, Bearing, bearing!, controlForX, yVal
+include("Spline_exports.jl")
 
 struct Bearing
-	xs::Vector{Float64}
-	ys::Vector{Float64}
+	xys::Vector{Point2D}
 	angle::Float64
-	Bearing(x, y, deg) = Bearing((x, y), deg)
-	function Bearing((x, y), deg)
-		xs = zeros(Float64, 3)
-		ys = zeros(Float64, 3)
-		rad = 2pi*deg/360
+	function Bearing(xy::Point2D, deg)
+		rad = deg2rad(deg)
 		spd = 0.01
-		xs[1], ys[1] = x-spd * cos(rad), y-spd * sin(rad)
-		xs[2], ys[2] = x, y
-		xs[3], ys[3] = x+spd * cos(rad), y+spd * sin(rad)
-
-		new(xs, ys, rad)
+		xys = Point2D[
+			Point2D(xy.x-spd * cos(rad), yx.y-spd * sin(rad)),
+			xy,
+		 	Point2D(xy.x+spd * cos(rad), xy.y+spd * sin(rad))
+		]
+		new(xys, rad)
 	end
 end
+
+xs(b::Bearing) = map(xy->xy.x for xy in xys)
+ys(b::Bearing) = map(xy->xy.y for xy in xys)
 
 struct Control
 	xs::Float64
@@ -25,8 +25,8 @@ struct Control
 	p::Polynomial{Float64}
 
 	function Control(b1, b2)
-		p = fit(vcat(b1.xs, b2.xs), vcat(b1.ys, b2.ys))
-		new(b1.xs[2], b2.xs[2], p)
+		p = fit(vcat(xs(b1), xs(b2)), vcat(ys(b1), ys(b2)))
+		new(b1.xys[2].x, b2.xys[2].x, p)
 	end
 end
 
@@ -36,7 +36,6 @@ struct Spline
 	controls::Vector{Control}
 	Spline(b::Bearing) = new([b], Vector{Control}())
 end
-
 
 function controlForX(s::Spline, x::Float64)
 	if x < s.controls[1].xs

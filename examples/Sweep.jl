@@ -1,11 +1,11 @@
-#!/usr/local/bin/julia 
 
 using TriMeshes
+#using SVG
+using LinearAlgebra
 
 debug = false
 
 n = Net()
-
 
 function profile(path::Vertex)
 	[(1,2), (2,1.6), (3,1.75), (3.5, 2), (4,2.2), (5,2), (6,1), (7,0.2), (8, 0.2), (9, 0.8), (9.3, 1), (10, 1.6), (10.3, 2), (10.7, 3), (10.8, 4), (10.9,5), (10.7, 6), (10.5, 7), (10,7.2), (9,7.3), (8, 7.1), (7.8, 7), (7.3, 6), (7,5.8), (6.4, 5), (6,4.75), (5,4), (4,4.5), (3.5, 5), (3.2, 6), (3,6.3), (2.3,7), (2,7.01), (1,6), (0.7, 5), (0.5,4), (0.6, 3)], Vertex(0,0,1)
@@ -19,7 +19,9 @@ function normal(t::Real, tstep::Real, fpath)
 	t0 = fpath(t - tstep, tstep)
 	t1 = fpath(t, tstep)
 	t2 = fpath(t + tstep, tstep)
-	normalize((t1 - t0) + (t2 - t1))
+	v = (t1 - t0) + (t2 - t1)
+	n = normalize([v.x, v.y, v.z])
+	Vertex(n[1], n[2], n[3])
 end
 
 function solid(origin::Vertex, n::Net, slices::Real, fpath, slicer)
@@ -28,7 +30,7 @@ function solid(origin::Vertex, n::Net, slices::Real, fpath, slicer)
 	ve = 0
 	for t in 0.0:tstep:1.0
 
-		if debug @printf("\nT: %0.2f\n", t) end
+		if debug println("T: $t") end
 
 		path = origin + fpath(t, tstep)
 		pathv = vertex!(n, path)
@@ -37,8 +39,8 @@ function solid(origin::Vertex, n::Net, slices::Real, fpath, slicer)
 		pathnorm = normal(t, tstep, fpath)
 
 
-		if debug @printf("pathnorm %s\n", pathnorm) end
-		if debug @printf("slicenorm %s\n", slicenorm) end
+		if debug println("pathnorm $pathnorm") end
+		if debug println("slicenorm $slicenorm") end
 
 		pathay = angleXZ(pathnorm)
 		sliceay = angleXZ(slicenorm)
@@ -51,8 +53,8 @@ function solid(origin::Vertex, n::Net, slices::Real, fpath, slicer)
 
 		rot = Vertex(0., sliceay-pathay, 0.)
 
-		if debug @printf("pathax:%d sliceax:%d pathay:%d sliceay:%d\n", rad2deg(pathax), rad2deg(sliceax), rad2deg(pathay), rad2deg(sliceay)) end
-		if debug @printf("rotating x:%d y:%d z:%d\n", rad2deg(rot.x), rad2deg(rot.y), rad2deg(rot.z)) end
+		if debug println("pathax:$(round(Int, rad2deg(pathax))) sliceax:$(round(Int, rad2deg(sliceax))) pathay:$(round(Int, rad2deg(pathay))) sliceay:$(round(Int(rad2deg(sliceay))))") end
+		if debug println("rotating x:$(round(Int,rad2deg(rot.x))) y:$(round(Int,rad2deg(rot.y))) z:$(round(Int,rad2deg(rot.z)))") end
 
 		for (x,y) in slicepts
 			v = rotate(Vertex(x, y, 0), rot)
@@ -139,9 +141,8 @@ function stockp(t::Float64, tstep::Float64)
 	Vertex(x,y,z)
 end
 
-using SVG
+#==
 function pathsvg(fname, tstep, fpath)
-	s = open(fname, "w+")
 	pts = Vector{Tuple{Real,Real}}()
 	st = fpath(1., tstep)
 	for stch = 1:1
@@ -150,14 +151,11 @@ function pathsvg(fname, tstep, fpath)
 			push!(pts, (stch*st.x+v.x, stch*st.z+v.z))
 		end
 	end
-	SVG.open(s, 500.,500.)
-	SVG.polyline(s, pts, SVG.blackline(3.))
-	SVG.close(s)
+	
+	write(fname, Svg([Polyline(pts; style=Style(;strokewidth=3))]), 500, 500; inhtml=true)
+
 end
-
-
-pathsvg("stk.svg", 1/38, stockp)
-
+==#
 
 function sweep(n::Net, steps, multiples=1)
 	e = o = Vertex(0,0,0)
@@ -173,20 +171,22 @@ function knit(n, stitches::Integer, rowpairs::Integer)
 	vs = 1
 	for rp = 1:rowpairs
 		pe, ve = sweep(n, 16, stitches)
-		transformVerts(n, v->rotate(v, Vertex(deg2rad(40), 0, 0)), vs, ve)
-		transformVerts(n, v->translate(v, Vertex(0,ty,0)), vs, ve)
+		transformVerts!(n, v->rotate(v, Vertex(deg2rad(40), 0, 0)), vs, ve)
+		transformVerts!(n, v->translate(v, Vertex(0,ty,0)), vs, ve)
 
 		vs = ve + 1
 		pe, ve = sweep(n, 16, stitches)
-		transformVerts(n, v->rotate(v, Vertex(deg2rad(-40), 0, 0)), vs, ve)
-		transformVerts(n, v->translate(v, Vertex(15,ty,0)), vs, ve)
+		transformVerts!(n, v->rotate(v, Vertex(deg2rad(-40), 0, 0)), vs, ve)
+		transformVerts!(n, v->translate(v, Vertex(15,ty,0)), vs, ve)
 		vs = ve + 1
 		ty += 15
 	end
 
-	STL_ASCII(n, "stk.stl")
+	#STL_ASCII(n, "stk.stl")
 end
 
-
-knit(n, 3, 2)
+function go()
+	#pathsvg("stk.svg", 1/38, stockp)
+	knit(n, 3, 2)
+end
 
