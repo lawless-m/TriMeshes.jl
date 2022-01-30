@@ -330,7 +330,7 @@ function cube!(n, w, h, d; origin=Vertex(0,0,0))
 	v(x,y,z) = Vertex(origin.x+x, origin.y+y, origin.z+z)
 	
 	# front
-	quad!(n, v(0,0,0), v(0,h,0), v(w,h,0), v(0,w,0))
+	quad!(n, v(0,0,0), v(0,h,0), v(w,h,0), v(w,0,0))
 	# left
 	quad!(n, v(0,0,d), v(0,h,d), v(0,h,0), v(0,0,0))
 	# back
