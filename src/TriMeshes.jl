@@ -18,6 +18,7 @@ export quadRSlice, quadVSlice, outerSlice, innerSlice
 export cylinder!, flatDisk!, tube!, flatRing!
 export transformVerts!, apply!
 export areaXY, magnitude, normalize
+export cube
 
 struct Edge
 	from::Integer
