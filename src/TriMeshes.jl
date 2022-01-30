@@ -18,7 +18,7 @@ export quadRSlice, quadVSlice, outerSlice, innerSlice
 export cylinder!, flatDisk!, tube!, flatRing!
 export transformVerts!, apply!
 export areaXY, magnitude, normalize
-export cube
+export cube!
 
 struct Edge
 	from::Integer
@@ -42,17 +42,19 @@ end
 vertex!(n::Net, x, y, z) = vertex!(n, Vertex(x, y, z))
 vertex!(n::Net, x, y) = vertex!(n, Vertex(x, y, 0.0))
 vertex!(v::Vector{Vertex}, x, y, z) = vertex!(v, Vertex(x, y, z))
-vertex!(n::Net, v::Vertex) = vertex!(n.vertices, v)
-
-function vertex!(vs::Vector{Vertex}, v::Vertex)
+function vertex!(n::Net, v::Vertex)
 	h = hash(v)
-	i = get(vhashes, h, 0)
+	i = get(n.vhashes, h, 0)
 	if i == 0
-		push!(vs, v)
-		i = length(vs)
+		i = vertex!(n.vertices, v)
 		n.vhashes[h] = i
 	end
 	i
+end
+
+function vertex!(vs::Vector{Vertex}, v::Vertex)
+	push!(vs, v)
+	length(vs)
 end
 
 scale(n::Net, x, y, z) = map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
@@ -186,7 +188,6 @@ function flatRing!(n::Net, originL, astart, asteps, router, rinner, thickness)
 	originH = originL + Vertex(0,0,thickness)
 	astep = 2pi / asteps
 	for a in astep+astart:astep:2pi+astart
-
 		vno = map(p->vertex!(n, p[1] + Vertex(router*cos(p[2]), router*sin(p[2]), 0)), [(originL, a), (originL, a+astep), (originH, a), (originH, a+astep)])
 		vni = map(p->vertex!(n, p[1] + Vertex(rinner*cos(p[2]), rinner*sin(p[2]), 0)), [(originL, a), (originL, a+astep), (originH, a), (originH, a+astep)])
 
@@ -199,7 +200,6 @@ function flatRing!(n::Net, originL, astart, asteps, router, rinner, thickness)
 		face!(n, vni[2], vno[2], vno[1])
 		face!(n, vno[4], vni[3], vno[3])
 		face!(n, vno[4], vni[4], vni[3])
-
 	end
 
 end
@@ -315,7 +315,7 @@ function areaXY(a::Vertex, b::Vertex, c::Vertex)
 end
 areaXY(n::Net, f::Face) = areaXY(abc(n, f)...)
 
-function quad!(v1, v2, v3, v4)
+function quad!(n::Net, v1, v2, v3, v4)
 	a = vertex!(n, v1)
 	b = vertex!(n, v2)
 	c = vertex!(n, v3)
@@ -325,20 +325,23 @@ function quad!(v1, v2, v3, v4)
 	face!(n, a, c, d)
 end
 
-function cube(w, h, d)
-	n = Net()
+function cube!(n, w, h, d; origin=Vertex(0,0,0))
+	
+	v(x,y,z) = Vertex(origin.x+x, origin.y+y, origin.z+z)
+	
 	# front
-	quad(n, Vertex(0,0,0), Vertex(0,h,0), Vertex(w,h,0), Vertex(0,w,0))
+	quad!(n, v(0,0,0), v(0,h,0), v(w,h,0), v(0,w,0))
 	# left
-	quad(n, Vertex(0,0,d), Vertex(0,h,d), Vertex(0,h,0), Vertex(0,0,0))
+	quad!(n, v(0,0,d), v(0,h,d), v(0,h,0), v(0,0,0))
 	# back
-	quad(n, Vertex(w,0,d), Vertex(w,h,d), Vertex(0,h,d), Vertex(0,0,d))
+	quad!(n, v(w,0,d), v(w,h,d), v(0,h,d), v(0,0,d))
 	# right
-	quad(n, Vertex(w,0,0), Vertex(w,h,0), Vertex(w,h,d), Vertex(w,0,d))
+	quad!(n, v(w,0,0), v(w,h,0), v(w,h,d), v(w,0,d))
 	# top
-	quad(n, Vertex(0,h,0), Vertex(0,h,d), Vertex(w,h,d), Vertex(w,h,0))
+	quad!(n, v(0,h,0), v(0,h,d), v(w,h,d), v(w,h,0))
 	# bottom
-	quad(n, Vertex(0,0,d), Vertex(0,0,0), Vertex(w,0,d), Vertex(w,0,0))
+	quad!(n, v(0,0,d), v(0,0,0), v(w,0,d), v(w,0,0))
+	nothing;
 end
 
 
