@@ -1,8 +1,10 @@
 #!/usr/local/bin/julia 
 
+pushfirst!(LOAD_PATH, "/home/matt/Documents/3dp/3dprinting/")
+
 using Mesh
 
-n = Net()
+n = Mesh.Net()
 
 function slice!(n::Net, r1, r2, z1, z2, rstp, steps)
 	r = r1
@@ -127,4 +129,4 @@ end
 
 
 
-hollow(n)
+solid(n)

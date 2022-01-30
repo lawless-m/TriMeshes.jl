@@ -23,9 +23,10 @@ end
 	
 struct Net
 	vertices::Vector{Vertex}
+	vhashes::Dict{UInt64, Int64}
 	faces::Vector{Face}
 	edges::Vector{Edge}
-	Net() = new(Vector{Vertex}(), Vector{Face}(), Vector{Edge}())
+	Net() = new(Vector{Vertex}(), Dict{UInt64, Int64}(), Vector{Face}(), Vector{Edge}())
 end
 
 vertex!(n::Net, x, y, z) = vertex!(n, Vertex(x, y, z))
@@ -33,13 +34,17 @@ vertex!(v::Vector{Vertex}, x, y, z) = vertex!(v, Vertex(x, y, z))
 vertex!(n::Net, v::Vertex) = vertex!(n.vertices, v)
 
 function vertex!(vs::Vector{Vertex}, v::Vertex)
-	push!(vs, v)
-	length(vs)
+	h = hash(v)
+	i = get(vhashes, h, 0)
+	if i == 0
+		push!(vs, v)
+		i = length(vs)
+		n.vhashes[h] = i
+	end
+	i
 end
 
-function scale(n::Net, x, y, z) 
-	map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
-end
+scale(n::Net, x, y, z) = map!(v->Vertex(v.x*x, v.y*y, v.z*z), n.vertices, n.vertices)
 
 face!(n::Net, v1, v2, v3) = push!(n.faces, Face(Edge(v1, v2), Edge(v2, v3), Edge(v3, v1)))
 
@@ -320,6 +325,33 @@ function areaXY(n::Net, f::Face)
 
 	h = abs(magnitude(ab) * sin(angleXY(ab) - angleXY(ca)))
 	area = 0.5 * h * magnitude(ca)
+end
+
+function quad!(v1, v2, v3, v4)
+	a = vertex!(n, v1)
+	b = vertex!(n, v2)
+	c = vertex!(n, v3)
+	d = vertex!(n, v4)
+
+	face!(n, a, b, c)
+	face!(n, a, c, d)
+end
+
+
+function cube(w, h, d)
+	n = Net()
+	# front
+	quad(n, Vertex(0,0,0), Vertex(0,h,0), Vertex(w,h,0), Vertex(0,w,0))
+	# left
+	quad(n, Vertex(0,0,d), Vertex(0,h,d), Vertex(0,h,0), Vertex(0,0,0))
+	# back
+	quad(n, Vertex(w,0,d), Vertex(w,h,d), Vertex(0,h,d), Vertex(0,0,d))
+	# right
+	quad(n, Vertex(w,0,0), Vertex(w,h,0), Vertex(w,h,d), Vertex(w,0,d))
+	# top
+	quad(n, Vertex(0,h,0), Vertex(0,h,d), Vertex(w,h,d), Vertex(w,h,0))
+	# bottom
+	quad(n, Vertex(0,0,d), Vertex(0,0,0), Vertex(w,0,d), Vertex(w,0,0))
 end
 
 ###
