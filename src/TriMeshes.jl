@@ -322,7 +322,7 @@ function quad!(n::Net, v1, v2, v3, v4)
 	d = vertex!(n, v4)
 
 	face!(n, a, b, c)
-	face!(n, a, c, d)
+	face!(n, c, d, a)
 end
 
 function cube!(n, w, h, d; origin=Vertex(0,0,0))
